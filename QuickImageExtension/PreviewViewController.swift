@@ -4,13 +4,10 @@ import SwiftUI
 
 class PreviewViewController: NSViewController, QLPreviewingController {
 
-    private var imageView: NSImageView?
-    private var infoHostingView: NSHostingView<ImageInfoView>?
-
-    override func loadView() {
-        self.view = NSView()
-        self.view.wantsLayer = true
-        self.view.layer?.backgroundColor = NSColor.black.cgColor
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.wantsLayer = true
+        view.layer?.backgroundColor = NSColor.black.cgColor
     }
 
     func preparePreviewOfFile(at url: URL, completionHandler handler: @escaping (Error?) -> Void) {
@@ -19,23 +16,31 @@ class PreviewViewController: NSViewController, QLPreviewingController {
             return
         }
 
-        // Image view — fills the whole preview
-        let iv = NSImageView(frame: view.bounds)
+        // Image view — fills the whole preview using Auto Layout
+        let iv = NSImageView()
         iv.image = image
         iv.imageScaling = .scaleProportionallyUpOrDown
-        iv.autoresizingMask = [.width, .height]
+        iv.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(iv)
-        self.imageView = iv
+        NSLayoutConstraint.activate([
+            iv.topAnchor.constraint(equalTo: view.topAnchor),
+            iv.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            iv.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            iv.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+        ])
 
         // Metadata overlay
         if let metadata = ImageMetadataReader.read(from: url) {
             let infoView = ImageInfoView(metadata: metadata, filename: url.lastPathComponent)
             let hosting = NSHostingView(rootView: infoView)
-            hosting.frame = view.bounds
-            hosting.autoresizingMask = [.width, .height]
-            hosting.layer?.isOpaque = false
+            hosting.translatesAutoresizingMaskIntoConstraints = false
             view.addSubview(hosting)
-            self.infoHostingView = hosting
+            NSLayoutConstraint.activate([
+                hosting.topAnchor.constraint(equalTo: view.topAnchor),
+                hosting.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+                hosting.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+                hosting.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            ])
         }
 
         handler(nil)
