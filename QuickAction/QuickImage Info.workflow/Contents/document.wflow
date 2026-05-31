@@ -1,0 +1,322 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>AMApplicationBuild</key>
+	<string>523</string>
+	<key>AMApplicationVersion</key>
+	<string>2.10</string>
+	<key>AMDocumentVersion</key>
+	<string>2</string>
+	<key>actions</key>
+	<array>
+		<dict>
+			<key>action</key>
+			<dict>
+				<key>AMAccepts</key>
+				<dict>
+					<key>Container</key>
+					<string>List</string>
+					<key>Optional</key>
+					<true/>
+					<key>Types</key>
+					<array>
+						<string>com.apple.cocoa.path</string>
+					</array>
+				</dict>
+				<key>AMActionVersion</key>
+				<string>2.0.3</string>
+				<key>AMApplication</key>
+				<array>
+					<string>Automator</string>
+				</array>
+				<key>AMParameterProperties</key>
+				<dict>
+					<key>COMMAND_STRING</key>
+					<dict/>
+					<key>CheckedForUserDefaultShell</key>
+					<dict/>
+					<key>inputMethod</key>
+					<dict/>
+					<key>shell</key>
+					<dict/>
+					<key>source</key>
+					<dict/>
+				</dict>
+				<key>AMProvides</key>
+				<dict>
+					<key>Container</key>
+					<string>List</string>
+					<key>Types</key>
+					<array>
+						<string>com.apple.cocoa.string</string>
+					</array>
+				</dict>
+				<key>ActionBundlePath</key>
+				<string>/System/Library/Automator/Run Shell Script.action</string>
+				<key>ActionName</key>
+				<string>Run Shell Script</string>
+				<key>ActionParameters</key>
+				<dict>
+					<key>COMMAND_STRING</key>
+					<string>emulate -L zsh
+setopt no_nomatch
+
+sips_field() {
+    print -r -- "$1" | awk -v k="$2" '$1 == k":" { $1=""; sub(/^ /,""); print; exit }'
+}
+
+mdls_field() {
+    local v
+    v=$(mdls -raw -name "$2" "$1" 2&gt;/dev/null)
+    [[ "$v" == "(null)" ]] &amp;&amp; v=""
+    print -r -- "$v"
+}
+
+human_size() {
+    local b=$1
+    if (( b &lt; 1024 )); then print -r -- "${b} B"
+    elif (( b &lt; 1048576 )); then printf '%.0f KB\n' $(( b / 1024.0 ))
+    elif (( b &lt; 1073741824 )); then printf '%.2f MB\n' $(( b / 1048576.0 ))
+    else printf '%.2f GB\n' $(( b / 1073741824.0 )); fi
+}
+
+friendly_color() {
+    local p="$1" s="$2" l
+    l="${p:l}"
+    case "$l" in
+        *display\ p3*)  print -r -- "Display P3"; return ;;
+        *prophoto*)     print -r -- "ProPhoto RGB"; return ;;
+        *adobe\ rgb*)   print -r -- "Adobe RGB"; return ;;
+        *srgb*)         print -r -- "sRGB"; return ;;
+        *p3*)           print -r -- "P3"; return ;;
+        *gray*)         print -r -- "Grayscale"; return ;;
+        *cmyk*)         print -r -- "CMYK"; return ;;
+    esac
+    [[ -n "$p" ]] &amp;&amp; { print -r -- "$p"; return; }
+    case "$s" in
+        RGB)  print -r -- "RGB" ;;
+        CMYK) print -r -- "CMYK" ;;
+        GRAY|Gray) print -r -- "Grayscale" ;;
+        *) print -r -- "${s:-Unknown}" ;;
+    esac
+}
+
+describe() {
+    local f="$1"
+    local name="${f:t}"
+    local all w h dw dh bps spp alpha space profile fmt
+    all=$(sips -g all "$f" 2&gt;/dev/null)
+    w=$(sips_field "$all" pixelWidth)
+    h=$(sips_field "$all" pixelHeight)
+    dw=$(sips_field "$all" dpiWidth)
+    dh=$(sips_field "$all" dpiHeight)
+    bps=$(sips_field "$all" bitsPerSample)
+    spp=$(sips_field "$all" samplesPerPixel)
+    alpha=$(sips_field "$all" hasAlpha)
+    space=$(sips_field "$all" space)
+    profile=$(sips_field "$all" profile)
+    fmt=$(sips_field "$all" format)
+    local bytes size
+    bytes=$(stat -f%z "$f" 2&gt;/dev/null)
+    size=$(human_size ${bytes:-0})
+    local dpi
+    dw=${dw%%.*}; dh=${dh%%.*}
+    if [[ "$dw" == "$dh" ]]; then dpi="${dw:-72} dpi"; else dpi="${dw} × ${dh} dpi"; fi
+    local depth="${bps:-8}-bit"
+    [[ -n "$spp" ]] &amp;&amp; depth="$depth · $spp ch"
+    [[ "$alpha" == "yes" ]] &amp;&amp; depth="$depth + α"
+    local color
+    color=$(friendly_color "$profile" "$space")
+    local make model lens created iso fnum exp focal
+    make=$(mdls_field "$f" kMDItemAcquisitionMake)
+    model=$(mdls_field "$f" kMDItemAcquisitionModel)
+    lens=$(mdls_field "$f" kMDItemLensModel)
+    created=$(mdls_field "$f" kMDItemContentCreationDate)
+    iso=$(mdls_field "$f" kMDItemISOSpeed)
+    fnum=$(mdls_field "$f" kMDItemFNumber)
+    exp=$(mdls_field "$f" kMDItemExposureTimeSeconds)
+    focal=$(mdls_field "$f" kMDItemFocalLength)
+    local out="📷  ${name}
+────────────────────────
+Size:     ${w:-?} × ${h:-?} px
+File:     ${size}
+DPI:      ${dpi}
+Format:   ${fmt:u}
+Color:    ${color}"
+    [[ -n "$profile" ]] &amp;&amp; out+="
+Profile:  ${profile}"
+    out+="
+Depth:    ${depth}"
+    local cam="${make} ${model}"
+    cam="${cam## }"; cam="${cam%% }"
+    [[ -n "$cam" ]] &amp;&amp; out+="
+Camera:   ${cam}"
+    [[ -n "$lens" ]] &amp;&amp; out+="
+Lens:     ${lens}"
+    [[ -n "$created" ]] &amp;&amp; out+="
+Captured: ${created%% +*}"
+    local expo=()
+    [[ -n "$fnum" ]]  &amp;&amp; expo+=("ƒ/${fnum%%.0}")
+    if [[ -n "$exp" ]]; then
+        if (( exp &lt; 1 )) &amp;&amp; (( exp &gt; 0 )); then
+            expo+=("1/$(printf '%.0f' $(( 1.0 / exp )))s")
+        else
+            expo+=("${exp}s")
+        fi
+    fi
+    [[ -n "$iso" ]]   &amp;&amp; expo+=("ISO ${iso%%.0}")
+    [[ -n "$focal" ]] &amp;&amp; expo+=("${focal%%.0}mm")
+    (( ${#expo} )) &amp;&amp; out+="
+Exposure: ${(j: · :)expo}"
+    print -r -- "$out"
+}
+
+if (( $# == 0 )); then
+    osascript -e 'display dialog "No image selected." buttons {"OK"} default button "OK" with icon caution' &gt;/dev/null 2&gt;&amp;1
+    exit 0
+fi
+
+reports=()
+for f in "$@"; do
+    [[ -f "$f" ]] &amp;&amp; reports+=("$(describe "$f")")
+done
+message="${(j:\n\n:)reports}"
+esc=${message//\\/\\\\}
+esc=${esc//\"/\\\"}
+osascript -e "display dialog \"${esc}\" buttons {\"OK\"} default button \"OK\" with title \"QuickImage Info\"" &gt;/dev/null 2&gt;&amp;1</string>
+					<key>CheckedForUserDefaultShell</key>
+					<true/>
+					<key>inputMethod</key>
+					<integer>1</integer>
+					<key>shell</key>
+					<string>/bin/zsh</string>
+					<key>source</key>
+					<string></string>
+				</dict>
+				<key>BundleIdentifier</key>
+				<string>com.apple.RunShellScript</string>
+				<key>CFBundleVersion</key>
+				<string>2.0.3</string>
+				<key>CanShowSelectedItemsWhenRun</key>
+				<true/>
+				<key>CanShowWhenRun</key>
+				<true/>
+				<key>Category</key>
+				<array>
+					<string>AMCategoryUtilities</string>
+				</array>
+				<key>Class Name</key>
+				<string>RunShellScriptAction</string>
+				<key>InputUUID</key>
+				<string>A1B2C3D4-0001-0001-0001-000000000001</string>
+				<key>Keywords</key>
+				<array>
+					<string>Shell</string>
+					<string>Script</string>
+					<string>Command</string>
+					<string>Run</string>
+					<string>Unix</string>
+				</array>
+				<key>OutputUUID</key>
+				<string>A1B2C3D4-0001-0001-0001-000000000002</string>
+				<key>UUID</key>
+				<string>A1B2C3D4-0001-0001-0001-000000000003</string>
+				<key>UnlocalizedApplications</key>
+				<array>
+					<string>Automator</string>
+				</array>
+				<key>arguments</key>
+				<dict>
+					<key>0</key>
+					<dict>
+						<key>default value</key>
+						<integer>0</integer>
+						<key>name</key>
+						<string>inputMethod</string>
+						<key>required</key>
+						<string>0</string>
+						<key>type</key>
+						<string>0</string>
+						<key>uuid</key>
+						<string>0</string>
+					</dict>
+					<key>1</key>
+					<dict>
+						<key>default value</key>
+						<false/>
+						<key>name</key>
+						<string>CheckedForUserDefaultShell</string>
+						<key>required</key>
+						<string>0</string>
+						<key>type</key>
+						<string>0</string>
+						<key>uuid</key>
+						<string>1</string>
+					</dict>
+					<key>2</key>
+					<dict>
+						<key>default value</key>
+						<string></string>
+						<key>name</key>
+						<string>source</string>
+						<key>required</key>
+						<string>0</string>
+						<key>type</key>
+						<string>0</string>
+						<key>uuid</key>
+						<string>2</string>
+					</dict>
+					<key>3</key>
+					<dict>
+						<key>default value</key>
+						<string></string>
+						<key>name</key>
+						<string>COMMAND_STRING</string>
+						<key>required</key>
+						<string>0</string>
+						<key>type</key>
+						<string>0</string>
+						<key>uuid</key>
+						<string>3</string>
+					</dict>
+					<key>4</key>
+					<dict>
+						<key>default value</key>
+						<string>/bin/sh</string>
+						<key>name</key>
+						<string>shell</string>
+						<key>required</key>
+						<string>0</string>
+						<key>type</key>
+						<string>0</string>
+						<key>uuid</key>
+						<string>4</string>
+					</dict>
+				</dict>
+				<key>isViewVisible</key>
+				<integer>1</integer>
+				<key>location</key>
+				<string>309.000000:253.000000</string>
+				<key>nibPath</key>
+				<string>/System/Library/Automator/Run Shell Script.action/Contents/Resources/Base.lproj/main.nib</string>
+			</dict>
+			<key>isViewVisible</key>
+			<integer>1</integer>
+		</dict>
+	</array>
+	<key>connectors</key>
+	<dict/>
+	<key>workflowMetaData</key>
+	<dict>
+		<key>serviceInputTypeIdentifier</key>
+		<string>com.apple.Automator.fileSystemObject.image</string>
+		<key>serviceOutputTypeIdentifier</key>
+		<string>com.apple.Automator.nothing</string>
+		<key>serviceProcessesInput</key>
+		<integer>0</integer>
+		<key>workflowTypeIdentifier</key>
+		<string>com.apple.Automator.servicesMenu</string>
+	</dict>
+</dict>
+</plist>

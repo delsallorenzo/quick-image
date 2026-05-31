@@ -1,5 +1,23 @@
 # QuickImage
 
+Surface detailed image metadata (dimensions, DPI, color profile, ICC profile,
+bit depth, format, EXIF) on macOS.
+
+> **Recommended: the Quick Action.** See [`QuickAction/`](QuickAction/).
+>
+> On modern macOS a Quick Look Preview Extension cannot inject a metadata bar
+> onto the system's native image preview — when an extension declares
+> `public.image`, macOS prioritizes its built-in viewer and the extension is
+> discovered but never invoked. The [`QuickAction/`](QuickAction/) (a Finder
+> right-click service) is the clean, supported way to get the same info and
+> works on every recent macOS with no code signing.
+>
+> The Quick Look extension below is kept as a reference / experiment.
+
+---
+
+## (Experimental) Quick Look extension
+
 A macOS Quick Look extension that overlays image metadata at the bottom of the preview.
 
 ## What it shows
